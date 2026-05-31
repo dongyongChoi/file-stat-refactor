@@ -4,11 +4,14 @@ import com.toyproject.filestatrefactor.global.jpa.BaseTimeEntity;
 import com.toyproject.filestatrefactor.user.domain.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "files")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
+@Getter @Setter
 public class File extends BaseTimeEntity {
     @Id @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
@@ -30,4 +33,14 @@ public class File extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "folder_id", nullable = false)
     private Folder folder;
+
+    public static File create(User user, String fileName, String fileExt, Folder folder) {
+        File file = new File();
+        file.user = user;
+        file.fileStatus = FileStatus.ACTIVE;
+        file.fileName = fileName;
+        file.fileExt = fileExt;
+        file.folder = folder;
+        return file;
+    }
 }

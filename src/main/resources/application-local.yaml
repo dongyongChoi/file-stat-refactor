@@ -5,14 +5,19 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:FILE_STAT}
     password: ${SPRING_DATASOURCE_PASSWORD:FileStat1234}
 
+  sql:
+    init:
+      mode: always
+
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: create
     properties:
       hibernate:
         dialect: org.hibernate.dialect.OracleDialect
         format_sql: true
+    defer-datasource-initialization: true
 
 logging:
   level:

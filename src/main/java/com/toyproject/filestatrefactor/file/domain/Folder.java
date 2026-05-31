@@ -4,11 +4,14 @@ import com.toyproject.filestatrefactor.global.jpa.BaseTimeEntity;
 import com.toyproject.filestatrefactor.user.domain.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "folder")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
+@Getter @Setter
 public class Folder extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.SEQUENCE)

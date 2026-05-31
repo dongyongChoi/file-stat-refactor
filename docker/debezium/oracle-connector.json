@@ -1,0 +1,25 @@
+{
+  "name": "file-stat-oracle-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.oracle.OracleConnector",
+    "tasks.max": "1",
+    "topic.prefix": "file-stat",
+    "database.hostname": "oracle",
+    "database.port": "1521",
+    "database.user": "C##DBZUSER",
+    "database.password": "dbz",
+    "database.dbname": "FREE",
+    "database.pdb.name": "FREEPDB1",
+    "database.connection.adapter": "logminer",
+    "schema.include.list": "FILE_STAT",
+    "table.include.list": "FILE_STAT.FILES,FILE_STAT.FILE_HIST,FILE_STAT.FOLDER",
+    "include.schema.changes": "false",
+    "snapshot.mode": "initial",
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:19092",
+    "schema.history.internal.kafka.topic": "file-stat.schema-history",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false"
+  }
+}

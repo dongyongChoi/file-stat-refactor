@@ -9,6 +9,25 @@ spring:
     init:
       mode: always
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      fail-fast: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:file-stat-refactor-local}
+      auto-offset-reset: latest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+
   jpa:
     open-in-view: false
     hibernate:
@@ -23,3 +42,11 @@ logging:
   level:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
+
+app:
+  debezium:
+    topic-prefix: file-stat
+    topics:
+      files: file-stat.FILE_STAT.FILES
+      file-hist: file-stat.FILE_STAT.FILE_HIST
+      folder: file-stat.FILE_STAT.FOLDER

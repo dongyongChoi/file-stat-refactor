@@ -1,5 +1,7 @@
 package com.toyproject.filestatrefactor.file.application;
 
+import com.toyproject.filestatrefactor.file.application.request.FileDeleteRequest;
+import com.toyproject.filestatrefactor.file.application.request.FileMoveRequest;
 import com.toyproject.filestatrefactor.file.application.request.FileUploadRequest;
 import com.toyproject.filestatrefactor.file.domain.File;
 import com.toyproject.filestatrefactor.file.domain.FileHist;
@@ -110,5 +112,38 @@ class FileServiceTest {
 
         assertThat(uploadFileId).isNotNull();
         assertThat(uploadFileId).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("파일을 삭제하면 파일의 상태값이 DELETED로 변경된다")
+    void deleteFileTest() {
+        // given
+        Long fileId = 1L;
+        FileDeleteRequest fileDeleteRequest = new FileDeleteRequest(1L);
+        File foundFile = new File();
+        given(fileRepository.findById(fileId)).willReturn(Optional.of(foundFile));
+
+        // when
+        fileService.delete(fileId, fileDeleteRequest);
+
+        // then
+        assertThat(foundFile.getFileStatus()).isEqualTo(FileStatus.DELETED);
+    }
+
+    @Test
+    @DisplayName("휴지통으로 이동하면 파일의 상태값이 TRASHED로 변경된다")
+    void moveToTrashTest() {
+        // given
+        Long fileId = 1L;
+        FileMoveRequest fileMoveRequest = new FileMoveRequest(1L, 1L);
+        File foundFile = new File();
+        foundFile.setFileStatus(FileStatus.ACTIVE);
+        given(fileRepository.findById(fileId)).willReturn(Optional.of(foundFile));
+
+        // when
+        fileService.moveToTrash(fileId, fileMoveRequest);
+
+        // then
+        assertThat(foundFile.getFileStatus()).isEqualTo(FileStatus.TRASHED);
     }
 }

@@ -1,4 +1,6 @@
 package com.toyproject.filestatrefactor.file.application.request;
 
-public record FileDeleteRequest() {
+public record FileDeleteRequest(
+        Long userId
+) {
 }

@@ -5,6 +5,7 @@ import com.toyproject.filestatrefactor.file.application.request.FileMoveRequest;
 import com.toyproject.filestatrefactor.file.application.request.FileUploadRequest;
 import com.toyproject.filestatrefactor.file.domain.File;
 import com.toyproject.filestatrefactor.file.domain.FileHist;
+import com.toyproject.filestatrefactor.file.domain.FileStatus;
 import com.toyproject.filestatrefactor.file.domain.Folder;
 import com.toyproject.filestatrefactor.file.infrastructure.persistence.FileHistRepository;
 import com.toyproject.filestatrefactor.file.infrastructure.persistence.FileRepository;
@@ -43,12 +44,28 @@ public class FileService {
     }
 
     @Transactional
-    public void delete(FileDeleteRequest fileDeleteRequest) {
-        throw new UnsupportedOperationException();
+    public void delete(Long fileId, FileDeleteRequest fileDeleteRequest) {
+        File foundFile = fileRepository.findById(fileId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 파일입니다."));
+
+        // 이미 삭제된 상태값인 경우
+        if (FileStatus.DELETED.equals(foundFile.getFileStatus())) {
+            throw new IllegalArgumentException("존재하지 않는 파일입니다.");
+        }
+
+        foundFile.setFileStatus(FileStatus.DELETED);
     }
 
     @Transactional
-    public void moveToTrash(FileMoveRequest fileMoveRequest) {
-        throw new UnsupportedOperationException();
+    public void moveToTrash(Long fileId, FileMoveRequest fileMoveRequest) {
+        File foundFile = fileRepository.findById(fileId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 파일입니다."));
+
+        // ACTIVE 상태만 휴지통으로 옮길 수 있다.
+        if (!FileStatus.ACTIVE.equals(foundFile.getFileStatus())) {
+            throw new IllegalArgumentException("휴지통으로 옮길 수 없는 파일입니다.");
+        }
+
+        foundFile.setFileStatus(FileStatus.TRASHED);
     }
 }

@@ -86,46 +86,16 @@
 - 동시 요청 상황에서도 `1분 10건` 제한이 정확히 지켜지도록 설계합니다.
 - 실패, 롤백, TTL, 재시도, 발송 이력 저장 시점을 함께 고려합니다.
 
-## 로컬 인프라 실행
+## 로컬 실행 및 CDC Consumer 테스트
 
-Oracle, Kafka, Kafka Connect는 Docker Compose로 실행합니다.
-
-```bash
-docker compose up -d oracle kafka kafka-connect
-```
-
-Oracle 컨테이너가 `healthy` 상태가 되면 Debezium LogMiner가 사용할 수 있도록 Oracle을 `ARCHIVELOG` 모드로 전환합니다. 이 스크립트는 Oracle 인스턴스를 컨테이너 내부에서 재시작하므로 Connector 등록 전에 한 번 실행합니다.
-
-```bash
-bash docker/oracle/scripts/enable-archivelog.sh
-```
-
-`ARCHIVELOG` 전환 여부는 다음 명령으로 확인할 수 있습니다.
-
-```bash
-docker exec -i file-stat-oracle sqlplus -s / as sysdba <<'SQL'
-ARCHIVE LOG LIST;
-EXIT;
-SQL
-```
-
-Spring Boot는 `local` 프로필로 실행합니다.
-
-```bash
-./gradlew bootRun --args='--spring.profiles.active=local'
-```
-
-Windows 환경에서는 다음 명령을 사용할 수 있습니다.
-
-```bash
-gradlew.bat bootRun --args="--spring.profiles.active=local"
-```
-
-Kafka와 Debezium 로컬 접속 정보는 다음과 같습니다.
+## 로컬 접속 정보
 
 | 항목 | 값 |
 | --- | --- |
-| Bootstrap Servers | `localhost:9092` |
+| Application | `http://localhost:8080` |
+| Oracle JDBC | `jdbc:oracle:thin:@localhost:1521/FREEPDB1` |
+| Oracle App User | `FILE_STAT` / `FileStat1234` |
+| Kafka Bootstrap Servers | `localhost:9092` |
 | Consumer Group | `file-stat-refactor-local` |
 | Kafka Connect REST | `http://localhost:8083` |
 | Debezium Connector Name | `file-stat-oracle-connector` |
@@ -134,7 +104,53 @@ Kafka와 Debezium 로컬 접속 정보는 다음과 같습니다.
 | File History Topic | `file-stat.FILE_STAT.FILE_HIST` |
 | Folder Topic | `file-stat.FILE_STAT.FOLDER` |
 
-Kafka Connect가 준비되고 Oracle이 `ARCHIVELOG` 모드로 전환되면 Debezium Oracle Connector를 등록합니다.
+Oracle과 Kafka 데이터를 모두 지우고 처음부터 다시 테스트하려면 아래의 완전 초기화 절차를 따릅니다.
+
+## 완전 초기화 후 재시도
+
+CDC 테스트 중 Connector 상태가 꼬였거나, Oracle이 `ARCHIVELOG`로 전환되지 않았거나, Debezium 권한/스키마 초기화가 애매하다면 아래 순서로 깨끗하게 다시 시작합니다.
+
+먼저 실행 중인 Spring Boot 터미널을 `Ctrl+C`로 종료합니다.
+
+Docker Compose 컨테이너와 볼륨을 삭제합니다. 이 명령은 Oracle 데이터와 Kafka 토픽/오프셋을 모두 지웁니다.
+
+```bash
+docker compose down -v --remove-orphans
+```
+
+프로젝트 볼륨이 남아 있는지 확인합니다.
+
+```bash
+docker volume ls --filter name=file-stat-
+```
+
+`file-stat-oracle-data` 또는 `file-stat-kafka-data`가 남아 있다면 직접 삭제합니다.
+
+```bash
+docker volume rm file-stat-oracle-data file-stat-kafka-data
+```
+
+Kafka Connect 이미지를 완전히 다시 빌드하고 싶다면 캐시 없이 빌드합니다.
+
+```bash
+docker compose build --no-cache kafka-connect
+```
+
+그 다음 인프라를 다시 띄우고 컨테이너 상태를 확인합니다.
+
+```bash
+docker compose up -d --build oracle kafka kafka-connect
+docker compose ps
+```
+
+Oracle 컨테이너가 `healthy` 상태가 되면 `ARCHIVELOG` 전환 후 Spring Boot를 실행합니다.
+
+```bash
+bash docker/oracle/scripts/enable-archivelog.sh
+bash gradlew bootRun --args='--spring.profiles.active=local'
+```
+
+Spring Boot가 뜬 뒤 새 터미널에서 Connector를 다시 등록합니다.
 
 ```bash
 curl -i -X POST \
@@ -142,46 +158,4 @@ curl -i -X POST \
   -H "Content-Type:application/json" \
   http://localhost:8083/connectors \
   -d @docker/debezium/oracle-connector.json
-```
-
-Windows PowerShell에서는 다음 명령을 사용할 수 있습니다.
-
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8083/connectors" `
-  -ContentType "application/json" `
-  -InFile "docker/debezium/oracle-connector.json"
-```
-
-현재 구조는 단순 구현을 우선하므로 Debezium이 생성하는 테이블 토픽을 Consumer가 직접 구독합니다. 이후 이벤트 해석과 통계 갱신 흐름이 복잡해지면 별도의 통계 갱신 토픽과 DLQ를 분리합니다.
-
-Oracle Debezium 초기화 스크립트는 Oracle 컨테이너 최초 생성 시 한 번만 실행됩니다. 이미 `oracle-data` 볼륨이 만들어진 상태에서 초기화 스크립트를 다시 적용하려면 데이터를 삭제하고 다시 띄웁니다.
-
-```bash
-docker compose down -v
-docker compose up -d oracle kafka kafka-connect
-```
-
-초기화 스크립트에서는 Debezium 계정, 권한, supplemental logging만 설정합니다. Oracle 컨테이너 초기화 중 `SHUTDOWN` / `STARTUP`을 수행하면 컨테이너 healthcheck와 충돌할 수 있으므로 `ARCHIVELOG` 전환은 `docker/oracle/scripts/enable-archivelog.sh`로 분리합니다.
-
-이미 생성된 Oracle 컨테이너에서 `ORA-01950: insufficient quota on tablespace USERS` 오류가 발생했다면 Debezium 계정에 tablespace quota를 부여한 뒤 Connector를 재시작합니다. 이 quota는 Debezium이 LogMiner flush table을 생성하고 갱신하는 데 필요합니다.
-
-```bash
-docker exec -i file-stat-oracle sqlplus -s / as sysdba <<'SQL'
-ALTER USER C##DBZUSER QUOTA UNLIMITED ON USERS CONTAINER = ALL;
-EXIT;
-SQL
-```
-
-이미 Connector를 등록한 뒤 `LOG_MODE=ARCHIVELOG` 오류가 발생했다면 Oracle을 `ARCHIVELOG`로 전환한 뒤 Connector를 재시작합니다.
-
-```bash
-curl -X POST "http://localhost:8083/connectors/file-stat-oracle-connector/restart?includeTasks=true&onlyFailed=false"
-```
-
-상태 확인은 다음 명령으로 할 수 있습니다.
-
-```bash
-curl -s http://localhost:8083/connectors/file-stat-oracle-connector/status
 ```
